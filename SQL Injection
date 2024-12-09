@@ -1,0 +1,36 @@
+SQL Injection:
+A web application vulnerability that interferes with the queries an application makes to its database. By injecting malicious scripts into input fields or URLs, attackers can manipulate the database, access unauthorized data, or even modify or delete information
+
+Normal Query (Expected Behavior):
+A user inputs data (e.g., username and password).
+The application uses this input to form a query:
+SELECT * FROM users WHERE username = 'user123' AND password = 'pass123';
+The database checks for a matching user and password.
+
+SQL Injection (Exploited Behavior):
+An attacker inputs malicious SQL code instead of normal input.
+Example input for the username field:
+
+' OR '1'='1
+
+
+Resulting query:
+SELECT * FROM users WHERE username = '' OR '1'='1' AND password = 'pass123';
+
+
+Since '1'='1' is always true, the attacker bypasses authentication.
+
+Retrieving hidden data
+Imagine a shopping application that displays products in different categories. When the user clicks on the Gifts category, their browser requests the URL:
+https://insecure-website.com/products?category=Gifts
+This causes the application to make a SQL query to retrieve details of the relevant products from the database:
+SELECT * FROM products WHERE category = 'Gifts' AND released = 1
+This SQL query asks the database to return:
+all details (*)
+from the products table
+where the category is Gifts
+and released is 1.
+The restriction released = 1 is being used to hide products that are not released. We could assume for unreleased products, released = 0.
+
+
+
