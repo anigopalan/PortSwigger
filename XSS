@@ -1,0 +1,88 @@
+Cross-Site Scripting (XSS):
+
+Cross Site Scripting is a web security vulnerability that allows an attacker to compromise the interactions that users have with a vulnerable application
+Normally allow an attacker to masquerade as a victim user to carry out any actions that the user is able to perform, and to access any of the user’s data
+Depending on how much access the victim has, the attacker can compromise the whole systems functionality and data
+
+
+How does it work?
+Cross-site scripting works by manipulating a vulnerable web site so that it returns malicious JavaScript to users
+When the code executes in the browser, the attacker can compromise their interaction with the application
+The attacker identifies a field (a search box or comment section) where they can inject their code
+The website does not properly validate or sanitize the input
+The injected code is executed in the victim's browser when the affected page is loaded or interacted with
+
+Proof of Concept:
+Injecting a payload that causes your own browser to execute some arbitrary JavaScript.
+People use alert() function for this purpose because its short, harmless, and hard to miss when called. 
+
+Types of XSS:
+Stored XSS:
+Easier Terms:
+A website saves harmful data sent by an attacker
+Later, that harmful data is shown to other users without it being checked or cleaned
+When those users see it, the browser runs the harmful code thinking its safe
+Through that, the attacker can steal information, trick users into revealing data, perform unauthorized actions, spread the attack or damage the website
+In other words:
+The attacker’s malicious script is saved on the website’s server
+This happens when the attacker injects the script through inputs like comment, profile fields, or message boards
+The website saves the input in a database without sanitizing it 
+When another user views teh page, the brower renders the malicious script and executes it 
+Reflected XSS:
+Malicious scripts are part of the request and reflected off the server in the response (through URL parameters) without being stored
+The attacker embeds the harmful code in a URL or form field
+The victim clicks the link or submits a form, usually after being tricked into doing so
+Example: the attacker might send the link via email, social media, or a phishing message
+The website then takes the malicious code from the request and reflects it in the webpage without sanitizing it
+The browser thinks the reflected content is legitimate and runs the harmful script 
+In other words:
+The malicious script is NOT stored in a server, instead it is included in a URL or form submission and tricks a user into sending a request to the website
+The victim clicks the URL and the website processes the q parameter and reflects it back in the response
+The victims browser executes the script
+DOM-Based XSS:
+Vulnerability exists entirely on the client-side JavaScript code (in the victims browser), without any involvement of the server
+The attacker manipulates the website’s javaScript or DOM (Document Object Model) to execute the malicious code
+The server doesn’t directly reflect or store the harmful script; instead, the website’s own JavaScript creates the vulnerability
+How it works:
+The attacker creates a malicious URL
+The website might have JS code that uses the URL or other user-controlled data without validation
+If the has(#...) contains harmful code, the website’s JS will insert it into the page
+When the victim visits the URL, the website processes the malicious script in the browser and executes it
+Since the attack only happens in the browser, the server is unaware of the issue
+
+
+Example:
+
+<script>alert('XSS Attack');</script>
+
+If the application does not sanitize this input, it could be displayed and executed by another user’s browser, causing the alert() function to run
+Alert() essentially is a javaScript function that displays a popup message box in the browser - typically used for debugging, alerts, or notifications.
+
+
+Alert() why is it common in XSS?
+Immediate feedback : its easy to test XSS vulnerabilities because alert() demonstrates teh code execution in the browser
+Simple to insert: it requires no additional dependencies or setup to function
+Proof of Concept: attackers can use it to show an XSS vulnerability without causing it real harm
+
+
+Mitigating XSS:
+Sanitize inputs: remove or escape potentially harmful characters
+Use Content Security Policies: Restrict what scripts can be executed on your site
+Validate Output:Ensure any data rendered in your browser is safely encoded
+Avoid eval(), inner HTML, or dynamic script insertion without sanitization
+User secure Frameworks like React or Angular to automatically sanitize user inputs
+
+
+
+Content Security Policy:
+Content Security Policy is a browser mechanism that aims to mitigate the impact of cross-site scripting and some other vulnerabilities. If an applications that has CSP also has a vulnerability, the CSP will make it hard to exploit the vulnerability
+
+
+
+
+This lab contains a simple reflected cross-site scripting vulnerability in the search functionality.
+To solve the lab, perform a cross-site scripting attack that calls the alert function.
+
+
+
+<script>alert(1)</script>
