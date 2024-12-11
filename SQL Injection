@@ -213,3 +213,10 @@ Example error:
 sql
 Copy code
 The ORDER BY position number 3 is out of range of the number of items in the select list.
+
+
+Retrieving multiple values within a single column:
+
+Essentially you can use a delimiter and || to concatenate different values into returning one string. 
+Ex. Output:
+anirudh~gopalan
