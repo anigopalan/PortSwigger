@@ -167,3 +167,49 @@ The UNION operator appends the result of the second SELECT query (SELECT credit_
 The application displays both the user data (if any) and the credit card details retrieved by the second query.
 4. Outcome:
 Sensitive data from the credit_cards table is leaked to the attacker via the application's response.
+
+
+When you use a valid query like ORDER BY 1, the computer does not explicitly output anything unusual. Instead, the query executes successfully, and the result set is returned sorted by the specified column.
+
+ORDER BY 1
+
+Behavior of a Valid Query with ORDER BY 1
+Execution without errors:
+If the query is valid, the database successfully processes it and returns the results sorted by the first column of the result set.
+
+Example Query:
+
+sql
+Copy code
+SELECT id, username FROM users WHERE username = 'wiener' ORDER BY 1;
+Column Index: 1 refers to the first column (id in this case).
+The results are sorted in ascending order of the id column.
+Application Output
+The output depends on how the application is designed:
+
+If results are displayed:
+You’ll see the data sorted by the specified column (e.g., by id).
+
+Example Output:
+
+markdown
+Copy code
+id   | username
+---------------
+1    | alice
+2    | bob
+3    | charlie
+If results are used internally:
+The application might not display anything, but you won’t notice errors, indicating the query executed successfully.
+
+If no rows match the WHERE clause:
+The application might return a generic "No results found" message, but it still won't throw an error since the query syntax is valid.
+
+Difference with an Invalid Query (e.g., ORDER BY 3 in a 2-column table)
+If you use ORDER BY 3 on a result set that only has 2 columns, the database throws an error because it cannot sort by a non-existent third column.
+
+Example error:
+
+sql
+Copy code
+The ORDER BY position number 3 is out of range of the number of items in the select list.
