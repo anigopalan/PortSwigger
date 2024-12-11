@@ -128,3 +128,42 @@ Escape input properly: Sanitize input to escape characters like ', ", or --.
 Validate input: Restrict inputs to expected formats (e.g., alphanumeric usernames).
 Employ least privilege: Ensure the database user used by the app has minimal permissions.
 By securing the application, such SQL Injection attacks can be avoided.
+
+
+
+A SQL injection UNION attack takes advantage of the SQL UNION operator, which combines the results of two or more SELECT queries into a single result set. This technique allows an attacker to extract data from other tables in the database by appending additional queries to the original query.
+
+Here’s a detailed explanation of how it works:
+
+How UNION Works
+The UNION keyword in SQL combines the results of multiple SELECT statements into a single result set. For example:
+
+sql
+Copy code
+SELECT a, b FROM table1 
+UNION 
+SELECT c, d FROM table2;
+This query:
+Returns two columns of data: one from table1 (a and b) and one from table2 (c and d).
+Both SELECT statements must return the same number of columns and compatible data types for the UNION to work.
+How a SQL Injection UNION Attack Works
+1. Initial Vulnerability:
+Suppose the application uses the following query to retrieve user-specific data:
+sql
+Copy code
+SELECT id, name FROM users WHERE username = 'wiener';
+The application takes user input (e.g., the username wiener) and directly embeds it in the SQL query.
+2. Attacker’s Input:
+An attacker can inject a malicious payload, such as:
+css
+Copy code
+' UNION SELECT credit_card_number, expiration_date FROM credit_cards--
+This changes the original query to:
+sql
+Copy code
+SELECT id, name FROM users WHERE username = '' UNION SELECT credit_card_number, expiration_date FROM credit_cards--';
+3. What Happens:
+The UNION operator appends the result of the second SELECT query (SELECT credit_card_number, expiration_date FROM credit_cards) to the result of the first query.
+The application displays both the user data (if any) and the credit card details retrieved by the second query.
+4. Outcome:
+Sensitive data from the credit_cards table is leaked to the attacker via the application's response.
