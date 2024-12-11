@@ -32,5 +32,40 @@ where the category is Gifts
 and released is 1.
 The restriction released = 1 is being used to hide products that are not released. We could assume for unreleased products, released = 0.
 
+Using -- to bypass a password check is an example of SQL Injection, a vulnerability that occurs when user input is directly included in SQL queries without proper validation or escaping. Let me explain how you can use -- to manipulate a query to bypass the password check, step by step:
 
+Understanding the Query Structure
+Suppose the application performs a SQL query like this when you log in:
+
+sql
+Copy code
+SELECT * FROM users WHERE username = 'wiener' AND password = 'bluecheese';
+The username and password inputs are directly embedded in the query.
+For login to succeed, the query must find a row in the users table where both conditions (username = 'wiener' and password = 'bluecheese') are true.
+Injecting Malicious Input
+Target the username field:
+
+By including an SQL comment sequence (--), you can "terminate" the rest of the query.
+Input the following in the username field:
+vbnet
+Copy code
+administrator'--
+Leave the password field blank or enter anything (it won't be checked).
+Resulting Query: When the application processes your input, the query becomes:
+
+sql
+Copy code
+SELECT * FROM users WHERE username = 'administrator'--' AND password = '';
+How This Works:
+
+The part of the query after -- is treated as a comment and ignored by the database.
+The effective query becomes:
+sql
+Copy code
+SELECT * FROM users WHERE username = 'administrator';
+The password condition is removed from the query.
+Outcome:
+
+If the users table contains a row where username = 'administrator', the query will return that row.
+The application assumes the login is successful because a valid user was found, even though the password wasn't verified.
 
