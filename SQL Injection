@@ -220,3 +220,30 @@ Retrieving multiple values within a single column:
 Essentially you can use a delimiter and || to concatenate different values into returning one string. 
 Ex. Output:
 anirudh~gopalan
+
+
+You can list the contents of a database from most databases:
+- Most databses have a set of views called a information schema to list the tables in the database
+SELECT * FROM information_schema.tables
+
+TABLE_CATALOG  TABLE_SCHEMA  TABLE_NAME  TABLE_TYPE
+=====================================================
+MyDatabase     dbo           Products    BASE TABLE
+MyDatabase     dbo           Users       BASE TABLE
+MyDatabase     dbo           Feedback    BASE TABLE
+
+From there you can find specific information about the tables found
+
+In this case there is the users table which you could use a query to find the columns and data types
+
+SELECT * FROM information_schema.columns WHERE table_name = 'Users'
+
+TABLE_CATALOG  TABLE_SCHEMA  TABLE_NAME  COLUMN_NAME  DATA_TYPE
+=================================================================
+MyDatabase     dbo           Users       UserId       int
+MyDatabase     dbo           Users       Username     varchar
+MyDatabase     dbo           Users       Password     varchar
+
+
+BLIND SQL:
+- attacker cannot directly see the results of their queries. 
