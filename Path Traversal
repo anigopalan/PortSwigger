@@ -1,0 +1,140 @@
+Path traversal also known as direectory traversal allows for an attacker to access files and directories on a server beyond the intended scope of the application. 
+- This exploit occurs when an application doesn't properly sanitize the inputs that specify filepaths 
+
+When a web application uses user-provided input to construct file paths, attackers can manipulate
+this input to traverse the file system. They achieve this by including special characters like ../
+(dot-dot-slash), which tells the system to navigate up one directory level. By chaining these
+sequences, an attacker can move outside the application's intended file structure and access
+sensitive files or directories.
+
+
+Path traversal is also known as directory traversal. These vulnerabilities enable an attacker to read arbitrary files on the server that is running an application. This might include:
+
+Application code and data.
+Credentials for back-end systems.
+Sensitive operating system files.
+In some cases, an attacker might be able to write to arbitrary files on the server, allowing them to modify application data or behavior, and ultimately take full control of the server.
+
+
+This example demonstrates how a path traversal vulnerability allows an attacker to access arbitrary files on a server's filesystem by manipulating the filename parameter of a URL. Let’s break it down step by step:
+
+Scenario Setup
+Shopping Application: Displays item images using an endpoint like:
+html
+Copy code
+<img src="/loadImage?filename=218.png">
+File Location: Images are stored on disk at /var/www/images/.
+How It Works: The application appends the provided filename to the base directory (/var/www/images/) and retrieves the file.
+For example, the request:
+
+
+https://insecure-website.com/loadImage?filename=218.png
+Constructs the file path:
+
+/var/www/images/218.png
+Reads the file contents and sends them back to the browser.
+The Vulnerability
+The application does not validate or sanitize the filename parameter. This means an attacker can supply malicious input to construct file paths that point outside of /var/www/images/.
+
+The Attack
+The attacker sends the following malicious request:
+
+https://insecure-website.com/loadImage?filename=../../../etc/passwd
+This manipulates the file path as:
+
+/var/www/images/../../../etc/passwd
+What Does ../ Do?
+../ means "go up one level in the directory structure."
+Three consecutive ../ sequences step up:
+From /var/www/images/ to /var/www/
+From /var/www/ to /var/
+From /var/ to / (the root directory)
+As a result, the application ends up trying to access:
+
+
+/etc/passwd
+
+
+Common obstacles to exploiting path traversal vulnerabilities
+Many applications that place user input into file paths implement defenses against path traversal attacks. These can often be bypassed.
+
+If an application strips or blocks directory traversal sequences from the user-supplied filename, it might be possible to bypass the defense using a variety of techniques.
+
+You might be able to use an absolute path from the filesystem root, such as filename=/etc/passwd, to directly reference a file without using any traversal sequences.
+
+
+Common obstacles to exploiting path traversal vulnerabilities - Continued
+You might be able to use nested traversal sequences, such as ....// or ....\/. These revert to simple traversal sequences when the inner sequence is stripped.
+
+
+Why It Works
+Improper Stripping: If the application filters ../ by removing only the .. part but leaves the /, the nested sequence ....// can revert back to ../ when the filtering mechanism strips the innermost ..:
+
+less
+Copy code
+Original input: ....//
+After filtering: ../
+Combination of Characters: Some input sanitization functions might not handle combinations like ....// or ....\/ correctly. These can resolve back to valid traversal sequences when the filesystem processes the path.
+
+
+Encoding Techniques to Bypass Stripping
+When ../ is stripped, attackers can encode it to obfuscate the traversal sequence. The server or application decodes the input before processing, inadvertently restoring the malicious payload.
+
+1. URL Encoding
+Standard URL encoding replaces special characters with a % followed by their hexadecimal ASCII code:
+. becomes %2e
+/ becomes %2f
+An attacker can encode ../ as:
+perl
+Copy code
+%2e%2e%2f
+If the application decodes this input back into ../, the attack succeeds.
+
+
+
+2. Double URL Encoding
+Some servers decode input multiple times, which attackers exploit by double encoding:
+
+Encode %2e as %252e (% itself is encoded as %25).
+Encode %2f as %252f.
+The double-encoded traversal sequence looks like this:
+
+perl
+Copy code
+%252e%252e%252f
+On decoding, the application resolves this back to %2e%2e%2f, and a second decoding step resolves it to ../.
+
+
+
+The bypass occurs when an application implements naive validation by checking only whether the user-supplied filename starts with the required base folder, but does not validate the resolved (absolute) file path after processing traversal sequences.
+
+In this case, an attacker includes the base folder as part of their input, followed by traversal sequences (../ or equivalents). The operating system resolves these sequences, allowing the attacker to access files outside the intended directory.
+
+Why Add the Base Folder?
+Restrict File Access:
+
+By forcing all file accesses to start from a specific directory (e.g., /var/www/images), the application attempts to ensure that only legitimate files in that directory can be accessed.
+Convenience for Users:
+
+Users only need to provide the file name (e.g., 218.png), not the full file path (/var/www/images/218.png). The application appends the base folder to construct the full file path.
+Improved Security (Intended):
+
+The developer assumes that by appending a fixed base folder, they can prevent the user from specifying paths outside the intended directory.
+
+
+What Is a Null Byte?
+A null byte (\0 or %00 in URL encoding) is a special character in C-based programming languages (and others) that represents the end of a string. When encountered in a file path, everything after the null byte is ignored.
+
+For example:
+
+Input: filename=../../../etc/passwd%00.png
+The null byte (%00) causes the file path to terminate after ../../../etc/passwd.
+The application might see the full string (../../../etc/passwd%00.png) during validation but pass only ../../../etc/passwd to the filesystem.
+
+
+The most effective way to prevent path traversal vulnerabilities is to avoid passing user-supplied input to filesystem APIs altogether. Many application functions that do this can be rewritten to deliver the same behavior in a safer way.
+
+If you can't avoid passing user-supplied input to filesystem APIs, we recommend using two layers of defense to prevent attacks:
+
+Validate the user input before processing it. Ideally, compare the user input with a whitelist of permitted values. If that isn't possible, verify that the input contains only permitted content, such as alphanumeric characters only.
+After validating the supplied input, append the input to the base directory and use a platform filesystem API to canonicalize the path. Verify that the canonicalized path starts with the expected base directory.
