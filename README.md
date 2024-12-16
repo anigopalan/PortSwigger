@@ -3,3 +3,5 @@ Here is the coursework I have studied so far in PortSwigger:
 - SQL Injection
 - Path Traversal
 - Web LLM Attacks
+- API Testing
+- Authentication Vulnerabilities
