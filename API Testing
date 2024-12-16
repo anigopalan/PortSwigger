@@ -1,0 +1,368 @@
+Testing API's
+
+Breaking Down the API Recon Process
+1. Identify API Endpoints
+Endpoints are specific paths or URLs where an API receives requests to perform actions or access resources.
+Each endpoint typically corresponds to a specific function or data resource in the system.
+Example:
+GET /api/books retrieves a list of books.
+GET /api/books/mystery retrieves a list of mystery books.
+Why It’s Important:
+Knowing the available endpoints helps you map out the API's functionality and test its features systematically.
+
+2. Determine How to Interact with Endpoints
+Once you’ve identified endpoints, the next step is to understand how they work. This involves gathering details such as:
+
+Input Data:
+
+Compulsory Parameters: These are required for the API to function correctly.
+Example: A /api/books/search endpoint might require a query parameter to specify the search term.
+Example Request:
+GET /api/books/search?query=thriller HTTP/1.1
+Host: example.com
+Optional Parameters: These refine or customize the API response but aren’t mandatory.
+Example: Adding a limit parameter to restrict the number of books returned.
+
+HTTP Methods:
+
+Determine which HTTP methods the API supports for each endpoint:
+GET: Retrieve data (e.g., list of books).
+POST: Send data to the server (e.g., add a new book).
+PUT: Update existing data (e.g., modify book details).
+DELETE: Remove a resource (e.g., delete a book).
+Supported Formats:
+
+Check which media types the API accepts and returns (e.g., JSON, XML).
+Example:
+Content-Type: application/json
+Accept: application/xml
+
+Rate Limits:
+
+APIs often impose restrictions on how many requests a client can make in a given time frame.
+Example: 100 requests per minute.
+Understanding rate limits helps prevent tests from being blocked or triggering throttling mechanisms.
+Authentication Mechanisms:
+
+Determine how the API handles access control and authorization.
+Common authentication methods:
+API Keys: A unique key required in the header or query parameters.
+OAuth Tokens: Temporary access tokens generated through an authentication flow.
+Basic Auth: Username and password encoded in the request header.
+
+There's also API documentation that allows for humans to understand how to use the API
+
+Steps to Use Intruder for Finding Hidden Endpoints
+Configure Burp Intruder
+
+Intercept the request to the known endpoint (/api/user/update) using Burp Proxy.
+Send the request to Intruder for further testing.
+Identify the Target Injection Point
+
+Highlight the specific part of the endpoint you want to test, such as /update.
+Define this as the payload position for Intruder.
+Choose a Payload
+
+Use a wordlist containing common endpoint names, such as:
+sql
+Copy code
+add
+delete
+list
+search
+get
+create
+edit
+remove
+Run the Attack
+
+Intruder sends multiple requests by replacing /update with each word from the payload list:
+http
+Copy code
+PUT /api/user/add
+PUT /api/user/delete
+PUT /api/user/list
+Analyze Responses
+
+Look for unusual or interesting responses in the status codes or body content:
+200 OK or 201 Created: Indicates a valid endpoint.
+403 Forbidden: The endpoint exists but requires authentication.
+404 Not Found: Likely means the endpoint doesn’t exist.
+500 Internal Server Error: Suggests the server processed something unexpectedly, indicating a potential issue.
+
+Finding hidden parameters
+When you're doing API recon, you may find undocumented parameters that the API supports. You can attempt to use these to change the application's behavior. Burp includes numerous tools that can help you identify hidden parameters:
+
+Burp Intruder enables you to automatically discover hidden parameters, using a wordlist of common parameter names to replace existing parameters or add new parameters. Make sure you also include names that are relevant to the application, based on your initial recon.
+The Param miner BApp enables you to automatically guess up to 65,536 param names per request. Param miner automatically guesses names that are relevant to the application, based on information taken from the scope.
+The Content discovery tool enables you to discover content that isn't linked from visible content that you can browse to, including parameters.
+
+
+Mass Assignment Vulnerabilities occur when an application automatically binds request
+parameters to internal objects or models without properly validating or filtering them.
+This can allow attackers to manipulate unintended parameters and potentially access or modify restricted fields.
+
+
+Mass assignment (also known as auto-binding) can inadvertently create hidden parameters. It occurs when software frameworks automatically bind request parameters to fields on an internal object. Mass assignment may therefore result in the application supporting parameters that were never intended to be processed by the developer.
+ChatGPT said:
+ChatGPT
+Mass Assignment Vulnerabilities occur when an application automatically binds request parameters to internal objects or models without properly validating or filtering them. This can allow attackers to manipulate unintended parameters and potentially access or modify restricted fields.
+
+How Mass Assignment Works
+Auto-Binding by Frameworks:
+
+Many frameworks (e.g., Ruby on Rails, Laravel, Django) offer features to automatically map incoming request parameters to fields in an object.
+Example:
+A JSON request:
+json
+Copy code
+{
+    "username": "john",
+    "email": "john@example.com"
+}
+gets mapped directly to a User object in the backend:
+python
+Copy code
+class User:
+    def __init__(self, username, email):
+        self.username = username
+        self.email = email
+Unintended Parameter Binding:
+
+If additional parameters are passed in the request, the framework might bind them to fields that were not intended for user modification.
+Example:
+json
+Copy code
+{
+    "username": "john",
+    "email": "john@example.com",
+    "is_admin": true
+}
+If the is_admin field is mapped and updated, the user could escalate privileges.
+Developer Oversight:
+
+Developers may not explicitly whitelist or validate which parameters are allowed, leading to unintended fields being updated.  
+
+Since mass assignment creates parameters from object fields, you can often identify these hidden parameters by manually examining objects returned by the API.
+
+For example, consider a PATCH /api/users/ request, which enables users to update their username and email, and includes the following JSON:
+
+{
+    "username": "wiener",
+    "email": "wiener@example.com",
+}
+A concurrent GET /api/users/123 request returns the following JSON:
+
+{
+    "id": 123,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "isAdmin": "false"
+}
+This may indicate that the hidden id and isAdmin parameters are bound to the internal user object, alongside the updated username and email parameters.
+
+Preventing vulnerabilities in APIs
+When designing APIs, make sure that security is a consideration from the beginning. In particular, make sure that you:
+
+Secure your documentation if you don't intend your API to be publicly accessible.
+Ensure your documentation is kept up to date so that legitimate testers have full visibility of the API's attack surface.
+Apply an allowlist of permitted HTTP methods.
+Validate that the content type is expected for each request or response.
+Use generic error messages to avoid giving away information that may be useful for an attacker.
+Use protective measures on all versions of your API, not just the current production version.
+To prevent mass assignment vulnerabilities, allowlist the properties that can be updated by the user, and blocklist sensitive properties that shouldn't be updated by the user.
+
+
+Server-Side Parameter Pollution Example
+Scenario
+A vulnerable web application takes user input and embeds it into a server-side request to an internal API without validating or encoding the input.
+
+Initial Request:
+
+A legitimate API call made by the server:
+http
+Copy code
+GET /api/internal/resource?user=123&action=view
+Host: example.com
+This retrieves the user's data.
+Attacker’s Exploit:
+
+The attacker manipulates the request to include multiple parameters:
+http
+Copy code
+GET /api/internal/resource?user=123&user=999&action=view
+Depending on how the server processes these parameters:
+If the last parameter (user=999) is prioritized, the attacker could view data for user 999.
+If parameters are concatenated or misinterpreted, the backend behavior could become unpredictable.
+Impact:
+
+Unauthorized access to user 999's data.
+Modification of server-side logic by injecting new or unexpected parameters.
+
+Testing for SSPP
+Inject Duplicate Parameters:
+
+Add multiple parameters with the same name to a query string or request body.
+Example:
+http
+Copy code
+GET /api/resource?role=user&role=admin
+Observe how the server handles them:
+Does it prioritize the first, last, or combine them?
+Does it throw an error or behave unpredictably?
+Inject Unexpected Parameters:
+
+Add unrelated or hidden parameters to a request.
+Example:
+http
+Copy code
+POST /api/resource
+Content-Type: application/json
+{
+    "user": "123",
+    "isAdmin": "true"
+}
+Monitor if these parameters affect server behavior.
+Test All Input Sources:
+
+Include query strings, form fields, headers, and path parameters in your tests.
+Analyze the Server’s Response:
+
+Look for changes in HTTP status codes, response body, or behavior indicating that the parameters were processed.
+
+Truncating Query Strings involves exploiting how certain servers handle URL-encoded characters, particularly the # character (%23),
+to truncate or manipulate server-side requests. This technique can lead to vulnerabilities such as bypassing restrictions or accessing unauthorized data.
+
+How It Works
+The Role of # in URLs:
+
+The # character in a URL typically acts as a fragment identifier on the client side.
+Anything after the # is ignored by the server and interpreted only by the browser (e.g., navigating to an anchor within a page).
+If URL-encoded as %23, it might still be passed to the server as part of the query string.
+Server-Side Behavior:
+
+When the server processes a URL-encoded # (%23) in a query string, it may inadvertently truncate the request or treat the subsequent string differently.
+This could cause the server to ignore certain parameters or misinterpret input, leading to unexpected behavior.
+
+
+Truncating Query Strings involves exploiting how certain servers handle URL-encoded characters, particularly the # character (%23), to truncate or manipulate server-side requests. This technique can lead to vulnerabilities such as bypassing restrictions or accessing unauthorized data.
+
+How It Works
+The Role of # in URLs:
+
+The # character in a URL typically acts as a fragment identifier on the client side.
+Anything after the # is ignored by the server and interpreted only by the browser (e.g., navigating to an anchor within a page).
+If URL-encoded as %23, it might still be passed to the server as part of the query string.
+Server-Side Behavior:
+
+When the server processes a URL-encoded # (%23) in a query string, it may inadvertently truncate the request or treat the subsequent string differently.
+This could cause the server to ignore certain parameters or misinterpret input, leading to unexpected behavior.
+Example Scenario
+Original Query
+A legitimate front-end request might look like this:
+
+http
+Copy code
+GET /users/search?name=peter&publicProfile=true
+Purpose: Retrieve a public profile for the user peter.
+Expected Behavior: The server requires the publicProfile=true parameter to ensure only public profiles are shown.
+Exploit Attempt
+An attacker modifies the query string:
+
+http
+Copy code
+GET /users/search?name=peter%23foo&publicProfile=true
+What Happens:
+
+The server processes peter%23foo as the name parameter.
+Depending on the server’s logic:
+The %23foo part might truncate the request.
+Or, the server might interpret foo as part of the name parameter.
+Outcome:
+
+If the request is truncated, the publicProfile=true parameter might be ignored.
+This could cause the server to return non-public profiles or bypass access restrictions.
+
+
+Injecting Invalid Parameters is a technique used to test how servers handle unexpected or malformed query strings
+by adding additional parameters via special characters, such as a URL-encoded & (%26).
+This can reveal vulnerabilities in how servers process and parse input,
+potentially allowing parameter injection to modify application behavior, bypass restrictions, or access unauthorized data.
+
+Example Scenario
+Original Query
+A legitimate front-end request might look like this:
+
+http
+Copy code
+GET /users/search?name=peter&publicProfile=true
+Expected Behavior:
+The name parameter is set to peter.
+The publicProfile=true parameter ensures that only public profiles are retrieved.
+Injected Query
+An attacker modifies the query string:
+
+http
+Copy code
+GET /users/search?name=peter%26foo=xyz&publicProfile=true
+What Happens:
+The %26 in the name parameter might be decoded by the server to &.
+The server processes the request as:
+http
+Copy code
+GET /users/search?name=peter&foo=xyz&publicProfile=true
+This results in an additional foo=xyz parameter being added to the server-side request.
+
+Testing for Server-Side Parameter Pollution in REST Paths
+Server-side parameter pollution (SSPP) in RESTful APIs can occur when user-provided input is embedded directly into URL paths without proper validation or encoding.
+By injecting path traversal sequences or manipulating REST parameters,
+attackers can exploit this vulnerability to access unauthorized resources, modify application behavior, or even escalate privileges.
+
+Step-by-Step Exploitation
+Inject Path Traversal Sequences:
+
+Modify the name parameter to include URL-encoded traversal characters:
+http
+Copy code
+GET /edit_profile.php?name=peter%2f..%2fadmin
+%2f = /, so the server constructs the path:
+http
+Copy code
+GET /api/private/users/peter/../admin
+Server Path Normalization:
+
+If the back-end API or server normalizes the path (resolving ../):
+http
+Copy code
+GET /api/private/users/admin
+The application might now:
+Fetch data for the admin user.
+Expose restricted resources.
+Analyze the Response:
+
+If the response contains data for admin or behaves differently, it confirms that the injected path was processed.
+
+Testing for server-side parameter pollution in structured data formats
+An attacker may be able to manipulate parameters to exploit vulnerabilities in the server's processing of other structured data formats, such as a JSON or XML. To test for this, inject unexpected structured data into user inputs and see how the server responds.
+
+Consider an application that enables users to edit their profile, then applies their changes with a request to a server-side API. When you edit your name, your browser makes the following request:
+
+POST /myaccount
+name=peter
+This results in the following server-side request:
+
+PATCH /users/7312/update
+{"name":"peter"}
+You can attempt to add the access_level parameter to the request as follows:
+
+POST /myaccount
+name=peter","access_level":"administrator
+If the user input is added to the server-side JSON data without adequate validation or sanitization, this results in the following server-side request:
+
+PATCH /users/7312/update
+{name="peter","access_level":"administrator"}
+This may result in the user peter being given administrator access.
+
+To prevent server-side parameter pollution, use an allowlist to define characters that don't need encoding,
+and make sure all other user input is encoded before it's included in a server-side request.
+You should also make sure that all input adheres to the expected format and structure.
