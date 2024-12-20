@@ -1,0 +1,65 @@
+What is Clickjacking?
+Clickjacking is a deceptive user-interface attack where a user is tricked into clicking on a hidden
+or unintended actionable element on a malicious website, thinking they are interacting with legitimate content.
+This typically involves hiding actionable elements (such as buttons, links, or forms) from one website on top of visible content from another website.
+
+
+CSRF Tokens and Their Role
+A CSRF token is a unique, session-specific, single-use number (or nonce) designed to prevent unauthorized actions during a Cross-Site Request Forgery (CSRF) attack.
+In a typical CSRF attack:
+An attacker forges a request using a victim’s session, bypassing user consent.
+The CSRF token ensures that the server only processes legitimate requests generated during the authenticated user’s session.
+Why CSRF Tokens Don’t Stop Clickjacking
+Clickjacking differs from CSRF because the malicious actions occur:
+On-domain: The user interacts with content that is loaded directly from the authentic website within a hidden iframe.
+With user consent: The user unknowingly performs the action by clicking on the hidden content, but the requests behave as part of a legitimate session.
+The CSRF token is still valid in this scenario because:
+The session is legitimate, and the token is embedded in the request.
+The attack doesn’t involve forging a request—it manipulates the user into interacting with hidden elements within the same domain.
+
+Example of Clickjacking:
+
+<head>
+	<style>
+		#target_website {
+			position:relative;
+			width:128px;
+			height:128px;
+			opacity:0.00001;
+			z-index:2;
+			}
+		#decoy_website {
+			position:absolute;
+			width:300px;
+			height:400px;
+			z-index:1;
+			}
+	</style>
+</head>
+...
+<body>
+	<div id="decoy_website">
+	...decoy web content here...
+	</div>
+	<iframe id="target_website" src="https://vulnerable-website.com">
+	</iframe>
+</body>
+
+
+Clickbandit
+Although you can manually create a clickjacking proof of concept as described above, 
+this can be fairly tedious and time-consuming in practice. 
+When you're testing for clickjacking in the wild, we recommend using Burp's Clickbandit tool instead. 
+This lets you use your browser to perform the desired actions on the frameable page, 
+then creates an HTML file containing a suitable clickjacking overlay.
+You can use this to generate an interactive proof of concept in a matter of seconds, without having to write a single line of HTML or CSS.
+
+
+How to prevent clickjacking attacks
+We have discussed a commonly encountered browser-side prevention mechanism, namely frame busting scripts. However, we have seen that it is often straightforward for an attacker to circumvent these protections. Consequently, server driven protocols have been devised that constrain browser iframe usage and mitigate against clickjacking.
+
+Clickjacking is a browser-side behavior and its success or otherwise depends upon browser functionality
+and conformity to prevailing web standards and best practice. Server-side protection against
+clickjacking is provided by defining and communicating constraints over the use of components such as iframes.
+However, implementation of protection depends upon browser compliance and enforcement of these constraints.
+Two mechanisms for server-side clickjacking protection are X-Frame-Options and Content Security Policy.
