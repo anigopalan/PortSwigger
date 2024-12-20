@@ -5,3 +5,4 @@ Here is the coursework I have studied so far in PortSwigger:
 - Web LLM Attacks
 - API Testing
 - Authentication Vulnerabilities
+- Clickjacking/ UI redressing
