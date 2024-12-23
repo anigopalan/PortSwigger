@@ -1,0 +1,103 @@
+Types of NoSQL injection
+There are two different types of NoSQL injection:
+
+Syntax injection - This occurs when you can break the NoSQL query syntax
+, enabling you to inject your own payload. The methodology is similar to that used in SQL injection.
+However the nature of the attack varies significantly, as NoSQL databases use a range of query languages, types of query syntax, and different data structures.
+Operator injection - This occurs when you can use NoSQL query operators to manipulate queries.
+
+You can potentially detect NoSQL injection vulnerabilities by attempting to break the query syntax. 
+To do this, systematically test each input by submitting fuzz strings and special characters that trigger
+a database error or some other detectable behavior if they're not adequately sanitized or filtered by the application.
+
+If you know the API language of the target database, use special characters
+and fuzz strings that are relevant to that language. Otherwise, use a variety of fuzz strings to target multiple API languages.
+
+Examples of NoSQL Injection
+1. Bypassing Authentication
+Consider a MongoDB-based login system where user input is used to check credentials:
+
+javascript
+Copy code
+// Example MongoDB query
+db.users.findOne({ username: inputUsername, password: inputPassword });
+If the input is not validated, an attacker could provide malicious inputs like:
+
+inputUsername = "admin"
+inputPassword = { "$ne": "" }
+The resulting query:
+
+javascript
+Copy code
+db.users.findOne({ username: "admin", password: { "$ne": "" } });
+Effect: The $ne operator (not equal) matches any password, allowing the attacker to bypass authentication and log in as the admin.
+
+NoSQL databases often use query operators, which provide ways to specify conditions that data must meet to be included in the query result. Examples of MongoDB query operators include:
+
+$where - Matches documents that satisfy a JavaScript expression.
+$ne - Matches all values that are not equal to a specified value.
+$in - Matches all of the values specified in an array.
+$regex - Selects documents where values match a specified regular expression.
+You may be able to inject query operators to manipulate NoSQL queries. To do this, systematically submit different operators into a range of user inputs, then review the responses for error messages or other changes.
+
+In JSON messages, you can insert query operators as nested objects. For example, {"username":"wiener"} becomes {"username":{"$ne":"invalid"}}.
+
+For URL-based inputs, you can insert query operators via URL parameters. For example, username=wiener becomes username[$ne]=invalid. If this doesn't work, you can try the following:
+
+Convert the request method from GET to POST.
+Change the Content-Type header to application/json.
+Add JSON to the message body.
+Inject query operators in the JSON.
+Note
+You can use the Content Type Converter extension to automatically convert the request method and change a URL-encoded POST request to JSON.
+
+Detecting operator injection in MongoDB
+Consider a vulnerable application that accepts a username and password in the body of a POST request:
+
+{"username":"wiener","password":"peter"}
+Test each input with a range of operators. For example, to test whether the username input processes the query operator, you could try the following injection:
+
+{"username":{"$ne":"invalid"},"password":"peter"}
+If the $ne operator is applied, this queries all users where the username is not equal to invalid.
+
+If both the username and password inputs process the operator, it may be possible to bypass authentication using the following payload:
+
+{"username":{"$ne":"invalid"},"password":{"$ne":"invalid"}}
+This query returns all login credentials where both the username and password are not equal to invalid. As a result, you're logged into the application as the first user in the collection.
+
+To target an account, you can construct a payload that includes a known username, or a username that you've guessed. For example:
+
+{"username":{"$in":["admin","administrator","superadmin"]},"password":{"$ne":""}}
+
+Exfiltrating data using operators
+Alternatively, you may be able to extract data using operators that don't enable you to run JavaScript. For example, you may be able to use the $regex operator to extract data character by character.
+
+Consider a vulnerable application that accepts a username and password in the body of a POST request. For example:
+
+{"username":"myuser","password":"mypass"}
+You could start by testing whether the $regex operator is processed as follows:
+
+{"username":"admin","password":{"$regex":"^.*"}}
+If the response to this request is different to the one you receive when you submit an incorrect password, this indicates that the application may be vulnerable. You can use the $regex operator to extract data character by character. For example, the following payload checks whether the password begins with an a:
+
+{"username":"admin","password":{"$regex":"^a*"}}
+
+
+Timing based injection
+Sometimes triggering a database error doesn't cause a difference in the application's response. In this situation, you may still be able to detect and exploit the vulnerability by using JavaScript injection to trigger a conditional time delay.
+
+To conduct timing-based NoSQL injection:
+
+Load the page several times to determine a baseline loading time.
+Insert a timing based payload into the input. A timing based payload causes an intentional delay in the response when executed. For example, {"$where": "sleep(5000)"} causes an intentional delay of 5000 ms on successful injection.
+Identify whether the response loads more slowly. This indicates a successful injection.
+The following timing based payloads will trigger a time delay if the password beings with the letter a:
+
+admin'+function(x){var waitTill = new Date(new Date().getTime() + 5000);while((x.password[0]==="a") && waitTill > new Date()){};}(this)+'admin'+function(x){if(x.password[0]==="a"){sleep(5000)};}(this)+'
+
+Preventing NoSQL injection
+The appropriate way to prevent NoSQL injection attacks depends on the specific NoSQL technology in use. As such, we recommend reading the security documentation for your NoSQL database of choice. That said, the following broad guidelines will also help:
+
+Sanitize and validate user input, using an allowlist of accepted characters.
+Insert user input using parameterized queries instead of concatenating user input directly into the query.
+To prevent operator injection, apply an allowlist of accepted keys.
