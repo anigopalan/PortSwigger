@@ -8,3 +8,4 @@ Here is the coursework I have studied so far in PortSwigger:
 - Clickjacking/ UI redressing
 - SSRF
 - noSQLi
+- CORS
