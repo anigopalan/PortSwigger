@@ -1,0 +1,205 @@
+What is SSRF?
+Server-side request forgery is a web security vulnerability that allows an attacker to cause the server-side application to make requests to an unintended location.
+
+In a typical SSRF attack,
+the attacker might cause the server to make a connection to internal-only services
+within the organization's infrastructure.
+In other cases, they may be able to force the server to connect to arbitrary external systems. This could leak sensitive data, such as authorization credentials.
+
+A successful SSRF attack can often result in unauthorized actions
+or access to data within the organization. 
+This can be in the vulnerable application,
+or on other back-end systems that the application can communicate with.
+In some situations, the SSRF vulnerability might allow an attacker to perform arbitrary command execution.
+
+An SSRF exploit that causes connections to external third-party systems might
+result in malicious onward attacks. 
+These can appear to originate from the organization hosting the vulnerable application.
+
+Step-by-Step Breakdown
+Normal Functionality:
+
+The application allows users to query the stock availability of items in specific stores.
+To achieve this, the front-end sends a request to a back-end API, specifying the API endpoint URL.
+Example request from the browser:
+http
+Copy code
+POST /product/stock HTTP/1.0
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 118
+
+stockApi=http://stock.weliketoshop.net:8080/product/stock/check%3FproductId%3D6%26storeId%3D1
+The server receives this request, fetches the data from the given URL (e.g., http://stock.weliketoshop.net:8080), and returns the stock status to the user.
+Exploitation:
+
+The attacker modifies the request to point to the loopback interface (localhost or 127.0.0.1):
+http
+Copy code
+POST /product/stock HTTP/1.0
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 118
+
+stockApi=http://localhost/admin
+The server processes this request and makes an HTTP call to http://localhost/admin.
+Bypassing Access Controls:
+
+Normally, the /admin endpoint is restricted to authenticated users and is inaccessible to external users.
+However, the server treats requests to localhost as coming from a trusted internal source and bypasses access controls.
+The server fetches and returns the sensitive contents of the /admin page to the attacker’s browser.
+Attack Outcome:
+
+The attacker now gains access to sensitive administrative functionality or data, such as user management, configurations, or database access.
+The attacker could potentially modify settings, extract sensitive data, or escalate the attack further.
+Why This Attack Works
+Trust in the Loopback Interface:
+
+Internal endpoints (e.g., /admin) are often designed to trust requests originating from the server’s loopback interface (127.0.0.1 or localhost).
+This trust assumes that only the server itself can access these endpoints, but SSRF bypasses this assumption by leveraging the server’s own functionality.
+No URL Validation:
+
+The application does not validate or sanitize the user-supplied stockApi URL, allowing the attacker to specify malicious or internal URLs.
+Lack of Access Control:
+
+The /admin endpoint does not enforce authentication or authorization for requests originating from the loopback interface.
+Impact of the Attack
+Access to Sensitive Endpoints:
+The attacker can access internal-only APIs, administrative panels, or sensitive data stored on the server.
+Privilege Escalation:
+If administrative functionality is exposed, the attacker can escalate privileges, such as creating new admin accounts or altering critical configurations.
+Data Exfiltration:
+Internal resources, such as database contents or server logs, can be retrieved and leaked to the attacker.
+
+1. Access Control Delegated to a Front-End Component
+How It Happens:
+
+In many architectures, access control checks are implemented in a separate component (e.g., a reverse proxy or web application firewall) that sits in front of the application server.
+The front-end component blocks unauthorized external access to sensitive endpoints (like /admin).
+However, requests originating from within the server bypass this front-end layer entirely and go directly to the application server, skipping the access control checks.
+Example:
+
+External requests to /admin are blocked by the front-end proxy.
+A local request (e.g., from 127.0.0.1/admin) bypasses the proxy and reaches the application server directly, which trusts the local machine and processes the request.
+Why This is Vulnerable:
+
+SSRF exploits this by tricking the application server into sending a local request that bypasses access controls.
+2. Disaster Recovery Mechanism
+How It Happens:
+
+Some applications include "fail-safe" mechanisms for disaster recovery, where:
+Administrative access is granted to any user originating from the local machine, bypassing authentication.
+This is intended for emergency situations, such as when an administrator loses their credentials.
+Design Assumption:
+
+The developers assume that only trusted users, like administrators, will have access to the server's local machine and can make requests from it.
+Why This is Vulnerable:
+
+An attacker can exploit SSRF to simulate a request originating from the local machine, triggering the disaster recovery mode and bypassing authentication entirely.
+Example:
+The /admin interface allows unauthenticated access when the request originates from 127.0.0.1.
+By sending a request like http://localhost/admin via SSRF, the attacker gains access.
+3. Administrative Interface on a Different Port
+How It Happens:
+
+Some applications separate the administrative interface from the main application by hosting it on a different port (e.g., localhost:8080/admin).
+This port is not exposed externally, making it inaccessible to ordinary users.
+Design Assumption:
+
+The developers assume that the administrative interface is safe because only local users can access it.
+Why This is Vulnerable:
+
+SSRF allows an attacker to send requests to the internal administrative port through the application server, bypassing the assumption that only trusted users can access it.
+Example:
+
+Main application runs on http://example.com (port 80).
+Admin interface runs on http://localhost:8080/admin.
+An attacker submits a malicious request:
+http
+Copy code
+POST /product/stock HTTP/1.0
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 118
+
+stockApi=http://localhost:8080/admin
+The server fetches the admin interface and returns sensitive data to the attacker.
+
+
+In this scenario, an attacker exploits a Server-Side Request Forgery (SSRF) vulnerability 
+to interact with back-end systems that are not directly accessible from the internet. 
+These internal systems are part of the application's infrastructure and typically have private, non-routable IP addresses 
+(e.g., in the range 192.168.x.x or 10.x.x.x). Because these systems are protected by the network topology, they often have weaker security measures, assuming they are unreachable by external users.
+
+Some applications block input containing hostnames like 127.0.0.1 and localhost, or sensitive URLs like /admin. In this situation, you can often circumvent the filter using the following techniques:
+
+Use an alternative IP representation of 127.0.0.1, such as 2130706433, 017700000001, or 127.1.
+Register your own domain name that resolves to 127.0.0.1. You can use spoofed.burpcollaborator.net for this purpose.
+Obfuscate blocked strings using URL encoding or case variation.
+Provide a URL that you control, which redirects to the target URL. Try using different redirect codes,
+as well as different protocols for the target URL. For example, switching from an http: to https: URL during the redirect has been shown to bypass some anti-SSRF filters.
+
+
+
+
+SSRF with Whitelist-Based Input Filters
+Some applications implement a whitelist-based input filter to restrict user-supplied URLs to a set of permitted values. These filters aim to prevent SSRF by rejecting URLs that don’t match certain patterns or domains. However, these filters can often be bypassed due to inconsistencies in URL parsing and validation, allowing attackers to exploit SSRF vulnerabilities despite the whitelist.
+
+How URL Parsing is Exploited
+The URL specification is complex and includes features that can create inconsistencies between the filtering logic and the back-end request handling. Attackers leverage these inconsistencies to bypass filters and trick the server into sending requests to malicious or unintended destinations.
+
+Bypassing Whitelist Filters
+1. Using the @ Character for Credentials
+What It Does:
+
+The @ character separates credentials from the hostname in a URL.
+Whitelist filters may only check the portion before the @, while the back-end server processes the hostname after the @.
+Example:
+
+Input: https://expected-host:fakepassword@evil-host
+What Happens:
+Filter: Matches https://expected-host and assumes it’s valid.
+Back-End Request: Resolves evil-host and sends the request there.
+2. Using the # Character for URL Fragments
+What It Does:
+
+The # character denotes a fragment in a URL, which is typically ignored by servers during HTTP requests.
+Whitelist filters may include fragments in their validation, while the back-end server ignores them.
+Example:
+
+Input: https://evil-host#expected-host
+What Happens:
+Filter: Sees https://evil-host#expected-host and assumes it’s valid because it contains expected-host.
+Back-End Request: Resolves evil-host and sends the request there, ignoring the fragment.
+
+It is sometimes possible to bypass filter-based defenses by exploiting an open redirection vulnerability.
+
+In the previous example, imagine the user-submitted URL is strictly validated to prevent malicious exploitation of the SSRF behavior.
+However, the application whose URLs are allowed contains an open redirection vulnerability.
+Provided the API used to make the back-end HTTP request supports redirections,
+you can construct a URL that satisfies the filter and results in a redirected request to the desired back-end target.
+
+For example, the application contains an open redirection vulnerability in which the following URL:
+
+/product/nextProduct?currentProductId=6&path=http://evil-user.net
+returns a redirection to:
+
+http://evil-user.net
+You can leverage the open redirection vulnerability to bypass the URL filter, and exploit the SSRF vulnerability as follows:
+
+POST /product/stock HTTP/1.0
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 118
+
+stockApi=http://weliketoshop.net/product/nextProduct?currentProductId=6&path=http://192.168.0.68/admin
+This SSRF exploit works because the application first validates that the supplied stockAPI URL is on an allowed domain,
+which it is. The application then requests the supplied URL, which triggers the open redirection. It follows the redirection, and makes a request to the internal URL of the attacker's choosing.
+
+
+Blind SSRF vulnerabilities occur if you can cause an application to issue a back-end HTTP request to a supplied URL,
+but the response from the back-end request is not returned in the application's front-end response.
+
+Blind SSRF is harder to exploit but sometimes leads to full remote code execution on the server or other back-end components.
+
+The most reliable way to detect blind SSRF vulnerabilities is using out-of-band (OAST) techniques. This involves attempting to trigger an HTTP request to an external system that you control, and monitoring for network interactions with that system.
+
+The easiest and most effective way to use out-of-band techniques is using Burp Collaborator.
+You can use Burp Collaborator to generate unique domain names, send these in payloads to the application, and monitor for any interaction with those domains.
+If an incoming HTTP request is observed coming from the application, then it is vulnerable to SSRF.
