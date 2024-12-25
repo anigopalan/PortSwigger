@@ -1,0 +1,223 @@
+What are file upload vulnerabilities?
+File upload vulnerabilities are when a web server allows users to upload files to its filesystem
+without sufficiently validating things like their name, type, contents, or size.
+Failing to properly enforce restrictions on these could mean that even a basic image upload
+function can be used to upload arbitrary and potentially dangerous files instead. This could even include server-side script files that enable remote code execution.
+
+In some cases, the act of uploading the file is in itself enough to cause damage.
+Other attacks may involve a follow-up HTTP request for the file, typically to trigger its execution by the server.
+
+In the worst case scenario, the file's type isn't validated properly, and the server configuration allows certain types of file (such as .php and .jsp) to be executed as code.
+In this case, an attacker could potentially upload a server-side code file that functions as a web shell, effectively granting them full control over the server.
+
+If the filename isn't validated properly, this could allow an attacker to overwrite critical files
+simply by uploading a file with the same name. If the server is also vulnerable to directory traversal,
+this could mean attackers are even able to upload files to unanticipated locations.
+
+Failing to make sure that the size of the file falls within expected thresholds could also enable a form
+of denial-of-service (DoS) attack, whereby the attacker fills the available disk space.
+
+
+This explanation dives into how web servers handle requests for static and executable files and how configurations determine the server's response to these requests. Let’s break it down step-by-step:
+
+1. How the Web Server Processes Requests
+When a web server receives an HTTP request, it parses the path in the request URL (e.g., /static/image.jpg or /script.php) to determine the file being requested.
+It identifies the file type using the file's extension (e.g., .jpg, .html, .php) and matches it to a preconfigured list of MIME (Multipurpose Internet Mail Extensions) types.
+Based on this mapping, the server determines how to handle the request.
+
+The Content-Type response header may provide clues as to what kind of file the server thinks it has served.
+If this header hasn't been explicitly set by the application code, it normally contains the result of the file extension/MIME type mapping.
+
+Web shell
+A web shell is a malicious script that enables an attacker to execute arbitrary commands on a remote web server simply by sending HTTP requests to the right endpoint.
+
+If you're able to successfully upload a web shell, you effectively have full control over the server. 
+This means you can read and write arbitrary files, exfiltrate sensitive data, even use the server to pivot attacks against both internal infrastructure and other servers outside the network.
+For example, the following PHP one-liner could be used to read arbitrary files from the server's filesystem:
+
+<?php echo file_get_contents('/path/to/target/file'); ?>
+
+
+Explaining the Context: Flawed File Type Validation
+When users submit data via an HTML form, the form's enctype (encoding type) determines how the data is sent to the server. The server needs to handle and validate this data properly to prevent issues like flawed file type validation, which can lead to security vulnerabilities.
+
+Key Concepts
+1. Form Data Submission
+When an HTML form is submitted, the data is sent to the server in a specific format, determined by the form's enctype attribute. The two common types are:
+
+application/x-www-form-urlencoded:
+
+Default encoding type for forms.
+Used for simple text inputs like name, email, or address.
+Encodes data as key-value pairs in the body of the HTTP request.
+Example Request Body:
+css
+Copy code
+name=John&email=john@example.com
+multipart/form-data:
+
+Used when a form includes file uploads (e.g., images, PDFs).
+Encodes files and form fields as separate parts in the request body, making it suitable for binary data.
+Example (simplified):
+css
+Copy code
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
+
+------WebKitFormBoundary
+Content-Disposition: form-data; name="name"
+
+John
+------WebKitFormBoundary
+Content-Disposition: form-data; name="file"; filename="example.pdf"
+Content-Type: application/pdf
+
+<binary content>
+------WebKitFormBoundary--
+2. The Need for File Type Validation
+When a user uploads a file via multipart/form-data, the server must validate the file to ensure it:
+
+Matches the expected file type (e.g., .jpg, .png, .pdf).
+Doesn't exceed the size limit.
+Doesn't contain malicious content (e.g., a disguised script).
+If validation is flawed, attackers can exploit it by uploading unexpected or malicious files.
+
+Examples of Flawed Validation
+1. MIME Type Mismatch
+What Happens:
+The server relies only on the file's MIME type provided in the request (e.g., application/pdf).
+An attacker changes the MIME type of a malicious file to match an allowed type.
+Example:
+Uploading a .php script disguised as a PDF:
+bash
+Copy code
+Content-Disposition: form-data; name="file"; filename="malicious.php"
+Content-Type: application/pdf
+2. File Extension Validation
+What Happens:
+The server only checks the file extension (e.g., .jpg, .pdf) to validate the file type.
+An attacker renames a malicious script to use an allowed extension.
+Example:
+Uploading a .php script renamed as malicious.jpg.
+3. Insufficient Content Validation
+What Happens:
+The server fails to inspect the actual content of the file.
+An attacker uploads a file with dangerous content (e.g., a web shell or malware).
+
+While it's clearly better to prevent dangerous file types being uploaded in the first place,
+the second line of defense is to stop the server from executing any scripts that do slip through the net.
+
+As a precaution, servers generally only run scripts whose MIME type they have been explicitly configured to execute.
+Otherwise, they may just return some kind of error message or, in some cases, serve the contents of the file as plain text instead:
+
+GET /static/exploit.php?command=id HTTP/1.1
+    Host: normal-website.com
+
+
+    HTTP/1.1 200 OK
+    Content-Type: text/plain
+    Content-Length: 39
+
+    <?php echo system($_GET['command']); ?>
+
+
+Strict Controls on Upload Directories:
+
+Directories intended for user uploads (e.g., /uploads/) are typically configured to treat all files as static files.
+This means files like .php, .jsp, or .exe will not be executed but served as plain text or not served at all.
+Nullifying Web Shells:
+
+If an attacker uploads a malicious script (e.g., shell.php) to the upload directory, it won’t execute because the server prevents execution in this directory.
+As a result, the attacker cannot use the uploaded file as a web shell.
+Leaking Source Code:
+
+Even though the script won’t execute, the server might serve its contents as plain text if the configuration is flawed.
+This could leak sensitive information like source code, credentials, or server-side logic.
+
+1. Server Configuration Basics
+Web servers like Apache are configured to handle specific file types and behaviors. These configurations are typically set in global configuration files, such as /etc/apache2/apache2.conf on Apache servers.
+
+Example: Enabling PHP on Apache
+For an Apache server to execute PHP scripts (.php files), it needs specific modules and directives in its configuration:
+
+LoadModule Directive:
+
+This directive loads the PHP module into the Apache server, enabling it to process PHP files.
+Example:
+apache
+Copy code
+LoadModule php_module /usr/lib/apache2/modules/libphp.so
+Without this module, Apache would treat .php files as plain text, sending the raw code to the client instead of executing it.
+AddType Directive:
+
+This directive tells Apache that files with the .php extension should be processed as application/x-httpd-php.
+Example:
+apache
+Copy code
+AddType application/x-httpd-php .php
+
+2. Common Obfuscation Techniques
+a. Case Sensitivity Exploitation
+What Happens:
+
+Validation checks might be case-sensitive, rejecting .php but missing variations like .pHp or .PhP.
+Later, when the server processes the file, the mapping of extensions to MIME types may be case-insensitive, recognizing .pHp as PHP and executing it.
+Example:
+
+Uploaded file: exploit.pHp
+Bypasses validation but is executed as PHP by the server.
+
+Similarly, certain file types may always contain a specific sequence of bytes in their header or footer.
+These can be used like a fingerprint or signature to determine whether the contents match the expected type. For example, JPEG files always begin with the bytes FF D8 FF.
+
+This is a much more robust way of validating the file type, but even this isn't foolproof.
+Using special tools, such as ExifTool, it can be trivial to create a polyglot JPEG file containing malicious code within its metadata.
+Provide multiple extensions. Depending on the algorithm used to parse the filename, the following file may be interpreted as either a PHP file or JPG image: exploit.php.jpg
+
+
+This explanation describes a specific type of vulnerability involving file upload race conditions, where attackers exploit a time window between when a file is temporarily uploaded to the server and when it is validated or removed. Let’s break this down step by step:
+
+1. What is a File Upload Race Condition?
+A race condition occurs when the correct functioning of a system depends on the timing or sequence of events, and an attacker manipulates that timing to exploit vulnerabilities. In the context of file uploads:
+
+The server temporarily stores a file (e.g., for validation or anti-virus scanning).
+If the file isn’t immediately validated, there is a brief window of time during which an attacker might interact with the file and exploit its presence.
+2. The Behavior Being Described
+Typical Workflow for File Validation
+Upload:
+
+The user uploads a file.
+The server temporarily stores the file in its filesystem.
+Validation:
+
+The server validates the file, typically using:
+Anti-virus software to check for malware.
+File validation rules (e.g., allowed types, sizes).
+If the file fails validation, it is deleted.
+Processing or Storing:
+
+If the file passes validation, it is processed or moved to a permanent storage location.
+The Vulnerability
+Short Window of Accessibility:
+
+During the time between uploading and deleting/validating, the file temporarily resides on the server.
+If the file is accessible (e.g., via a URL or direct filesystem path), an attacker could exploit it before it is removed.
+This window might last only a few milliseconds, but attackers can use automated tools to interact with the file during that time.
+Exploit Example:
+
+The attacker uploads a malicious script (e.g., shell.php).
+Before the server finishes validating and removing the file, the attacker accesses it via its URL or executes it directly on the server.
+
+Uploading malicious client-side scripts
+Although you might not be able to execute scripts on the server, you may still be able to upload scripts for client-side attacks. For example, if you can upload HTML files or SVG images, you can potentially use <script> tags to create stored XSS payloads.
+
+If the uploaded file then appears on a page that is visited by other users, their browser will execute the script when it tries to render the page.
+Note that due to same-origin policy restrictions, these kinds of attacks will only work if the uploaded file is served from the same origin to which you upload it.
+
+How to prevent file upload vulnerabilities
+Allowing users to upload files is commonplace and doesn't have to be dangerous as long as you take the right precautions. In general, the most effective way to protect your own websites from these vulnerabilities is to implement all of the following practices:
+
+Check the file extension against a whitelist of permitted extensions rather than a blacklist of prohibited ones. It's much easier to guess which extensions you might want to allow than it is to guess which ones an attacker might try to upload.
+Make sure the filename doesn't contain any substrings that may be interpreted as a directory or a traversal sequence (../).
+Rename uploaded files to avoid collisions that may cause existing files to be overwritten.
+Do not upload files to the server's permanent filesystem until they have been fully validated.
+As much as possible, use an established framework for preprocessing file uploads rather than attempting to write your own validation mechanisms.
