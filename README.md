@@ -6,3 +6,5 @@ Here is the coursework I have studied so far in PortSwigger:
 - API Testing
 - Authentication Vulnerabilities
 - Clickjacking/ UI redressing
+- SSRF
+- noSQLi
