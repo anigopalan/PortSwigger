@@ -1,0 +1,195 @@
+The most well-known type of race condition enables you to exceed some kind of limit imposed by the business logic of the application.
+
+For example, consider an online store that lets you enter a promotional code during checkout to get a one-time discount on your order. 
+To apply this discount, the application may perform the following high-level steps:
+
+Check that you haven't already used this code.
+Apply the discount to the order total.
+Update the record in the database to reflect the fact that you've now used this code.
+
+As you can see, the application transitions through a temporary sub-state;
+that is, a state that it enters and then exits again before request processing is complete.
+In this case, the sub-state begins when the server starts processing the first request, 
+and ends when it updates the database to indicate that you've already used this code.
+This introduces a small race window during which you can repeatedly claim the discount as many times as you like.
+
+There are many variations of this kind of attack, including:
+
+Redeeming a gift card multiple times
+Rating a product multiple times
+Withdrawing or transferring cash in excess of your account balance
+Reusing a single CAPTCHA solution
+Bypassing an anti-brute-force rate limit
+'
+Steps to Cause a Request Collision
+1. Identify a Vulnerable Endpoint
+Look for endpoints with limits, such as:
+Single-use tokens: Password reset links, promotional codes, or activation links.
+Rate-limited actions: Payment processing, voting systems, or user account updates.
+Resource allocation: Inventory systems where a resource (e.g., a product or coupon) is decremented.
+2. Use Concurrency
+You need to send multiple requests as close to the same time as possible to exploit the small timing window.
+
+3. Tools to Send Concurrent Requests
+Using Burp Suite
+Set Up Burp Repeater:
+
+Use Burp Repeater to create a request to the vulnerable endpoint.
+Craft a valid request (e.g., for a password reset or payment).
+Send Requests Rapidly:
+
+Manually send requests multiple times in quick succession.
+This is often enough for testing small windows.
+Use Burp Intruder:
+
+For automated high-speed attacks:
+Set up Burp Intruder.
+Configure it to send multiple requests simultaneously using the "Battering Ram" or "Cluster Bomb" attack types.
+Adjust the thread count to send many requests at once.
+
+                       The single-packet attack enables you to completely neutralize interference from network jitter by using a single TCP packet to complete 20-30 requests simultaneously.
+
+Single-packet attack
+Although you can often use just two requests to trigger an exploit, 
+sending a large number of requests like this helps to mitigate internal latency, also known as server-side jitter. 
+This is especially useful during the initial discovery phase. We'll cover this methodology in more detail.
+
+Example Exploit: Bypassing Multi-Factor Authentication (MFA)
+Normal MFA Workflow:
+
+Step 1: Enter username and password (first factor).
+Step 2: Enter a code from your phone or email (second factor).
+Step 3: Access the application.
+Exploitation:
+
+The attacker starts the MFA process using valid credentials (e.g., stolen username/password).
+Before completing Step 2 (entering the code), they directly request a URL in the application (e.g., /dashboard).
+If the application doesn't properly check that MFA is complete, it might grant access, bypassing the second factor entirely.
+Why This Works
+The application transitions through hidden states while processing your request.
+These states are temporary, but if an attacker times their actions right, they can:
+Skip steps in the workflow (e.g., bypass MFA).
+Interfere with the process to trigger a race condition.
+
+Why Skipping States is Possible
+Incomplete or Incorrect Validation
+
+The server might validate MFA at certain points but not consistently enforce it across the application.
+Example:
+The login endpoint checks MFA completion, but individual application pages (e.g., /dashboard) do not verify that MFA is completed.
+Race Conditions
+
+During the MFA process, the application temporarily grants partial access (e.g., the session is created but not fully authenticated).
+If the attacker interacts with the application during this time, they might skip the MFA check before the application realizes it hasn't been completed.
+Assumptions About State
+
+Some applications assume that if a user passes the first step (e.g., username/password),
+they are authorized for certain actions even before completing later steps like MFA.
+This flawed assumption allows attackers to exploit intermediate states.
+
+1. Use Locks for Critical Sections
+What It Does:
+Locks ensure that only one operation can access or modify a shared resource at a time.
+Examples:
+File Locking:
+Use file locks when writing or reading from shared files.
+Example in Python:
+python
+Copy code
+import fcntl
+
+with open('file.txt', 'r+') as file:
+    fcntl.flock(file, fcntl.LOCK_EX)  # Acquire exclusive lock
+    # Perform file operations
+    fcntl.flock(file, fcntl.LOCK_UN)  # Release lock
+Database Locking:
+Use database row or table locks to prevent concurrent modifications.
+Example in SQL:
+sql
+Copy code
+BEGIN TRANSACTION;
+SELECT * FROM accounts WHERE id = 1 FOR UPDATE;
+-- Perform update operations
+COMMIT;
+2. Use Atomic Operations
+What It Does:
+Ensures that critical operations are performed as a single, indivisible action.
+Examples:
+Database Transactions:
+
+Combine multiple database operations into a single transaction.
+Example:
+sql
+Copy code
+BEGIN TRANSACTION;
+UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+COMMIT;
+In Memory:
+
+Use atomic functions or libraries for shared memory variables.
+Example in Python using threading:
+python
+Copy code
+import threading
+
+lock = threading.Lock()
+with lock:
+    # Critical operation
+    shared_variable += 1
+3. Validate and Revalidate
+What It Does:
+Double-check shared resources before and after performing operations to ensure no changes occurred due to other processes.
+Example:
+For file uploads:
+Validate the file before saving it.
+Revalidate the file after saving to ensure it hasn’t been tampered with.
+4. Delay Resource Accessibility
+What It Does:
+Prevent access to shared resources until all validations are complete.
+Example:
+Store uploaded files in a temporary, non-accessible directory until validated, then move them to the final location.
+5. Use Timestamps or Versioning
+What It Does:
+Use timestamps or version numbers to track the last update to a resource and reject conflicting updates.
+Example:
+Implement an optimistic locking mechanism:
+Retrieve a resource along with its version.
+Ensure the version is the same before updating.
+Example in SQL:
+sql
+Copy code
+UPDATE accounts
+SET balance = 500, version = version + 1
+WHERE id = 1 AND version = 1;
+6. Limit Concurrency
+What It Does:
+Restrict the number of concurrent operations on shared resources.
+Examples:
+Use rate-limiting middleware to limit the number of requests a user can send in a short period.
+Example using NGINX:
+nginx
+Copy code
+limit_req_zone $binary_remote_addr zone=mylimit:10m rate=5r/s;
+server {
+    location / {
+        limit_req zone=mylimit burst=10;
+    }
+}
+7. Consistent Access Control
+What It Does:
+Enforce permissions and state checks consistently across all parts of the application.
+Examples:
+Verify a user’s session state before processing sensitive requests, such as accessing restricted areas or performing critical actions.
+8. Monitor and Detect Race Conditions
+What It Does:
+Detect anomalies caused by race conditions during development or runtime.
+Tools:
+Use testing tools like Burp Suite, OWASP ZAP, or ThreadSanitizer to identify race conditions.
+Analyze logs for unusual patterns like duplicate requests or mismatched states.
+9. Avoid Temporary Files in Shared Directories
+What It Does:
+Prevent attackers from exploiting temporary file race conditions.
+Examples:
+Save temporary files in private, non-accessible directories.
+Use unique file names to avoid conflicts.
