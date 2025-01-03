@@ -1,0 +1,118 @@
+A web cache is a storage system that holds copies of content to return to users quicker.
+The main purpose is to improve performance, save bandwith, and reduce the load on servers.
+
+When you request content from a website, instead of fetching the data from the server everytime, a web cache makes a copy of the data so that anyone else can use that copy
+
+Fetching data from the server can introduce latency and strain on the server, retrieving it from the caches takes off pressure and is quicker. 
+
+The Process:
+When a user reequests a piece of content, lets say they visit a websit, the client sends a request first to the cache to see if their is an existing copy of the cache
+- if there is a copy (cache hit)
+- if there is no copy (cache miss)
+:
+Then it goes back to the server, the server sends it to the cacher and it determines if it should store the content in a cache based on predefined rules then returns it to the client
+
+If it does:
+- the server determines it should save the response, whenever the user tries to make the same request, it automatically pulls it up from the cache:
+benefits of this:
+- quicker responses
+- less strain on server
+
+CDN uses caching: 
+CDN:
+- Content Delivery Networks (widespread distributed servers locates across different geographical regions. 
+CDNs speed up delivery by serving content by accessing the closest server to the user. This reduces load time by minimizing the distance the server has to travel
+
+When the cache receives an HTTP request, it must decide whether there is a cached response that it can serve directly,
+or whether it has to forward the request to the origin server. 
+The cache makes this decision by generating a 'cache key' from elements of the HTTP request. 
+Typically, this includes the URL path and query parameters, but it can also include a variety of other elements like headers and content type.
+
+If the incoming request's cache key matches that of a previous request, the cache considers them to be equivalent and serves a copy of the cached response.
+
+Static file extension rules - These rules match the file extension of the requested resource, for example .css for stylesheets or .js for JavaScript files.
+Static directory rules - These rules match all URL paths that start with a specific prefix. These are often used to target specific directories that contain only static resources, for example /static or /assets.
+File name rules - These rules match specific file names to target files that are universally required for web operations and change rarely, such as robots.txt and favicon.ico.
+
+ATTACKS:
+- attack a endpoint that requests a dynamic response containing sensitive information
+- Focus on endpoints that support the GET, HEAD, or OPTIONS methods as requests that alter the origin server's state are generally not cached.
+
+Identify a discrepancy in how the cache and origin server parse the URL path. This could be a discrepancy in how they:
+
+Map URLs to resources.
+Process delimiter characters.
+Normalize paths.
+
+Craft a malicious URL that uses the discrepancy to trick the cache into storing a dynamic response.
+When the victim accesses the URL, their response is stored in the cache. 
+Using Burp, you can then send a request to the same URL to fetch the cached response containing the victim's data. 
+Avoid doing this directly in the browser as some applications redirect users without a session or invalidate local data, which could hide a vulnerability.
+
+Make sure each request has a different cache key or you might be getting responses from previous caches
+
+Role of Path Mapping in WCD
+Path mapping refers to how URLs correspond to files or resources on the server.
+In WCD attacks, attackers exploit inconsistent or overly permissive path mapping combined with caching rules to make private resources publicly cacheable.
+
+1. Typical Path Mapping in Web Applications
+Web servers often map a URL path to:
+A static file (e.g., https://example.com/static/logo.png maps to /static/logo.png).
+A dynamically generated resource (e.g., https://example.com/profile maps to a user-specific profile page).
+2. Exploitation through Path Mapping
+Attackers leverage weak or improper path handling to manipulate how requests are interpreted by the server and the cache:
+
+a. Appending Fake File Extensions
+Attackers append extensions (e.g., .css or .jpg) to URLs that the web server doesn’t validate but the cache stores as static files.
+
+Example:
+URL: https://example.com/profile?user=123
+Normally dynamic, user-specific content.
+Modified URL: https://example.com/profile.css?user=123
+The cache sees it as static and stores the response.
+If this response contains sensitive user data (like a session token), it may now be accessible to the attacker.
+
+
+Delimiter discrepancies occur when there are inconsistencies or vulnerabilities in how systems, applications, or protocols handle delimiters (special characters or sequences used to separate parts of data). These discrepancies can lead to security risks, misinterpretations, or functional issues, especially in web applications, APIs, and databases.
+
+What Are Delimiters?
+Delimiters are characters or symbols used to separate data elements. Common examples include:
+
+Commas (,): CSV files.
+Ampersands (&): Query strings in URLs.
+Slashes (/): Directory paths or URL segments.
+Colons (:): Key-value pairs in some protocols.
+Spaces, tabs, or line breaks: In plaintext or structured data.
+How Delimiter Discrepancies Arise
+Different Interpretations Across Systems:
+
+Different systems or components (e.g., web servers, proxies, applications) may interpret delimiters differently.
+Example: A web server may treat ../ in a file path differently than an application layer.
+Improper Parsing:
+
+If a delimiter is misinterpreted or handled inconsistently during parsing, it can lead to unexpected behavior.
+Example: A CSV parser mishandling quoted values containing commas.
+Malformed Input:
+
+Attackers can exploit inconsistencies by injecting unexpected delimiters to alter data or disrupt processing.
+
+You can take a range of steps to prevent web cache deception vulnerabilities:
+
+Always use Cache-Control headers to mark dynamic resources, set with the directives no-store and private.
+Configure your CDN settings so that your caching rules don't override the Cache-Control header.
+Activate any protection that your CDN has against web cache deception attacks. Many CDNs enable you to set a cache rule that verifies that the response Content-Type matches the request's URL file extension. 
+For example, Cloudflare's Cache Deception Armor.
+Verify that there aren't any discrepancies between how the origin server and the cache interpret URL paths.
+
+1. File Path Normalization
+File path normalization ensures that file or directory paths are in a consistent and predictable format. This prevents path traversal attacks or misinterpretation of paths.
+
+Example:
+Input Path: ../folder/./file.txt
+Normalized Path: /folder/file.txt
+Why Normalize File Paths?
+Prevent directory traversal attacks (../../ used to access restricted directories).
+Ensure compatibility across operating systems (e.g., convert \ in Windows to / in Linux).
+Tools:
+Python: os.path.normpath()
+Linux: realpath command
