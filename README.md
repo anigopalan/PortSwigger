@@ -9,3 +9,5 @@ Here is the coursework I have studied so far in PortSwigger:
 - SSRF
 - noSQLi
 - CORS
+- Web Cache Deception
+- 
